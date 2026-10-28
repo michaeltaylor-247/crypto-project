@@ -1,9 +1,13 @@
 #Dr. Marian Zaki - CSCE 449 Applied Cryptography
-#Simple Server Application that can handle multiple client connections
+#Simple Server Application that can handle multiple client connections using threads
 #This is just something to get you started
 import socket
 from threading import Thread
 from datetime import datetime
+
+TCP_IP = '0.0.0.0'  #server will listen for and accept connections from any IP address
+TCP_PORT = 2004     #server port hardcoded for now
+BUFFER_SIZE = 2048
 
 # Multithreaded Python server : TCP Server Socket Thread Pool
 class ClientThread(Thread):
@@ -17,38 +21,37 @@ class ClientThread(Thread):
 
     def run(self):
         while True:
-            print("Connection: " + str(self.conn.fileno()))
-            data = self.conn.recv(2048)
-            now = datetime.now()
-            current_time = now.strftime("%H:%M:%S")
-            print("Server received data:" + str(self.msgCount) + ":" + str(data) + ":" + current_time)
-            print()
-            #MESSAGE = input("Server : Enter Response from Server/Enter exit:")
-            MESSAGE = "Server recieved your message number " + str(self.msgCount)
-            MESSAGE_BYTES = bytes(MESSAGE, 'utf-8')
-            self.conn.send(MESSAGE_BYTES)  # echo message to client
+            data = self.conn.recv(BUFFER_SIZE)
+            if not data:        #client disconnected with "exit"
+                break
+            current_time = datetime.now().strftime("%H:%M:%S")
+            print("Server recieved data:" + str(self.msgCount) + ":" + data.decode('utf-8') + ":" + current_time)
+            MESSAGE = "Echo #" + str(self.msgCount) + ": " + data.decode('utf-8')
+            self.conn.send(MESSAGE.encode('utf-8'))
             if data == b'exit':
                 break
             self.msgCount += 1
+        self.conn.close()
+        print("Connection closed for "+ self.ip + ":" + str(self.port))
 
-# Multithreaded Python server : TCP Server Socket Program Stub
-TCP_IP = '0.0.0.0'  #server will listen for and accept connections from any IP address
-TCP_PORT = 2004     #server port hardcoded for now
-#BUFFER_SIZE = 20  # Usually 1024, but we need quick response
+def main():
+    tcpServer = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    tcpServer.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+    tcpServer.bind((TCP_IP, TCP_PORT))
+    tcpServer.listen(4)  # 4 unaccepted connections that the system will allow before refusing new connections.
+    threads = []
 
-# Create, set options, bind process to socket...
-tcpServer = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-tcpServer.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-tcpServer.bind((TCP_IP, TCP_PORT))
-threads = []
+    try:
+        while True:
+            print("Server : Waiting for connections from TCP clients...")
+            (conn, (ip, port)) = tcpServer.accept()
+            newthread = ClientThread(conn, ip, port)
+            newthread.start()
+            threads.append(newthread)
+    except KeyboardInterrupt:
+        print("\nServer shutting down")
+    finally:
+        tcpServer.close()
 
-while True:
-    tcpServer.listen(4)
-    print("Server : Waiting for connections from TCP clients...")
-    (conn, (ip, port)) = tcpServer.accept()
-    newthread = ClientThread(conn, ip, port)
-    newthread.start()
-    threads.append(newthread)
-
-#for t in threads:
-#    t.join()
+if __name__ == "__main__":
+    main()
