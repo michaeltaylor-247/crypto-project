@@ -3,20 +3,37 @@
 #Note the code isn't well structured - for example: hard coded port numbers! This is just something to get you started
 import socket
 
-host = socket.gethostname()
-port = 2004  #server port
-BUFFER_SIZE = 2000
-#MESSAGE = input("Client: Enter message/ Enter exit:")
-MESSAGE = ""
-tcpClient = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-tcpClient.connect((host, port))
+HOST = socket.gethostname()
+PORT = 2004  #server port
+BUFFER_SIZE = 2048
 
-while MESSAGE != 'exit':
-    MESSAGE = input("Client: Enter message to continue/ Enter exit:")
-    MESSAGE_BYTES = bytes(MESSAGE, 'utf-8')
-    tcpClient.send(MESSAGE_BYTES)
-    data = tcpClient.recv(BUFFER_SIZE)
-    print("Client received data:", str(data))
+def main():
+    tcpClient = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    try:
+        tcpClient.connect((HOST, PORT))
+    except ConnectionRefusedError:
+        print("Could not connect to server at " + str(HOST) + ":" + str(PORT) + ". Is it running?")
+        return
 
-print("Client Terminating")
-tcpClient.close()
+    try:
+        while True:
+            MESSAGE = input("Client: Enter message to continue/ Enter exit:")
+            if not MESSAGE:          # don't send empty messages
+                continue
+            tcpClient.send(MESSAGE.encode('utf-8'))
+            data = tcpClient.recv(BUFFER_SIZE)
+            if not data:             # server closed the connection
+                print("Server closed the connection")
+                break
+            print("Client received data:", data.decode('utf-8'))
+            if MESSAGE == 'exit':
+                break
+    except (KeyboardInterrupt, ConnectionResetError, BrokenPipeError):
+        print("\nConnection ended")
+    finally:
+        print("Client Terminating")
+        tcpClient.close()
+
+
+if __name__ == "__main__":
+    main()
